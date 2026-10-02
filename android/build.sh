@@ -1,5 +1,6 @@
 #!/bin/bash
 set -eo pipefail
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 echo "--- Setup"
 rm /tmp/android-*.log || true
 export USE_CCACHE=1
@@ -106,6 +107,14 @@ if [[ "$TARGET_PRODUCT" != lineage_* ]]; then
     echo "breakfast failed, aborting..."
     exit 1
 fi
+
+echo "--- Applying device patches"
+# Patches the device tree carries for other projects (see device-patches.sh).
+# The next build resets every project before syncing anyway; reverting on
+# exit keeps the shared tree clean in between, whether this build succeeds
+# or fails.
+"$SCRIPT_DIR/device-patches.sh" apply "$PWD" "$(get_build_var TARGET_DEVICE_DIR)"
+trap '"$SCRIPT_DIR/device-patches.sh" revert /ssd02/WitAqua/${VERSION} || true' EXIT
 
 echo "--- Building"
 mka bacon | tee "/tmp/android-build-$BUILD_UUID.log"
